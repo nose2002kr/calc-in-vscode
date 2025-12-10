@@ -1,4 +1,4 @@
-import { TextEditor } from 'vscode';
+import { TextEditor, Selection } from 'vscode';
 
 export interface EngineResult {
     text: string;
@@ -70,9 +70,10 @@ export abstract class Engine {
     /**
      * 선택된 텍스트를 처리하여 결과를 반환
      * @param editor 현재 에디터
+     * @param selections 선택된 영역 배열
      * @returns 처리 결과
      */
-    abstract process(editor: TextEditor): EngineResult;
+    abstract process(editor: TextEditor, selections: readonly Selection[]): EngineResult;
     
     /**
      * 엔진별 커맨드 초기화

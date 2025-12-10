@@ -1,4 +1,4 @@
-import { TextEditor, env } from 'vscode';
+import { TextEditor, env, Selection } from 'vscode';
 import { Engine, EngineResult, EngineRule } from './Engine';
 
 // from https://stackoverflow.com/a/42264780/1013
@@ -12,34 +12,33 @@ export class SumEngine extends Engine {
         }
     ];
     
-    private numbers: number[] = [];
+    private result: EngineResult | null = null;
 
-    public process(editor: TextEditor): EngineResult {
-        this.numbers.length = 0;
+    public process(editor: TextEditor, selections: readonly Selection[]): EngineResult {
+        const numbers: number[] = [];
 
-        editor.selections.forEach(selection => {
+        selections.forEach(selection => {
             let text = editor.document.getText(selection);
-            this.numbers.push(...this._getNumber(text));
+            numbers.push(...this._getNumbers(text));
         });
         
-        const sum = this.numbers.reduce((a, b) => a + b, 0);
+        const sum = numbers.reduce((a, b) => a + b, 0);
         
-        return {
+        return this.result = {
             text: `Sum: ${sum}`,
-            copyText: `${sum}`
+            copyText: sum.toString()
         };
     }
 
     public initCommands(commandNamePrefix: string): Array<[string, () => void]> {
         return [
             [`${commandNamePrefix}.copyToClipboard`, () => {
-                const sum = this.numbers.reduce((a, b) => a + b, 0);
-                env.clipboard.writeText(`${sum}`);
+                env.clipboard.writeText(this.result?.copyText ?? '');
             }]
         ];
     }
 
-    private _getNumber(doc: string): number[] {
+    private _getNumbers(doc: string): number[] {
         let lines = doc.trim().split('\n');
 
         let numLines = lines.map((line) => {

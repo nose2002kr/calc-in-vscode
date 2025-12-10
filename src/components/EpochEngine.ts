@@ -1,4 +1,4 @@
-import { TextEditor, env } from 'vscode';
+import { TextEditor, env, Selection } from 'vscode';
 import { Engine, EngineResult, EngineRule } from './Engine';
 
 // from https://stackoverflow.com/a/42264780/1013
@@ -22,26 +22,32 @@ export class EpochEngine extends Engine {
         }
     ];
     
-    private time: number = 0;
-    private dateString: string = '';
     private dateFormat = DateFormat.LOCAL;
+    private result: EngineResult | null = null;
 
-    public process(editor: TextEditor): EngineResult {
-        const text = editor.document.getText(editor.selection);
-        const numbers = this._getNumber(text);
-        this.time = numbers[0] || 0;
-        this.updateText();
+    public process(editor: TextEditor, selections: readonly Selection[]): EngineResult {
+        const selection = selections[0];
+        if (!selection) {
+            return {
+                text: `Date: Error`,
+                copyText: ''
+            };
+        }
+
+        const text = editor.document.getText(selection);
+        const time  = this._getNumber(text);
+        const dateString = this.formatDate(time);
         
-        return {
-            text: `Date: ${this.dateString}`,
-            copyText: this.dateString
+        return this.result = {
+            text: `Date: ${dateString}`,
+            copyText: dateString
         };
     }
 
     public initCommands(commandNamePrefix: string): Array<[string, () => void]> {
         return [
             [`${commandNamePrefix}.copyToClipboard`, () => {
-                env.clipboard.writeText(`${this.dateString}`);
+                env.clipboard.writeText(this.result?.copyText ?? '');
             }],
             [`${commandNamePrefix}.switchDateFormat`, () => {
                 this.dateFormat = (this.dateFormat + 1) % 3;
@@ -50,16 +56,14 @@ export class EpochEngine extends Engine {
         ];
     }
     
-    private updateText() {
+    private formatDate(time: number): string {
         switch (this.dateFormat) {
             case DateFormat.UTC:
-                this.dateString = new Date(this.time).toUTCString();
-                break;
+                return new Date(time).toUTCString();
             case DateFormat.ISO:
-                this.dateString = new Date(this.time).toISOString();
-                break;
+                return new Date(time).toISOString();
             case DateFormat.LOCAL:
-                this.dateString = new Date(this.time).toLocaleString(env.language ?? 'en-US', {
+                return new Date(time).toLocaleString(env.language ?? 'en-US', {
                     timeZoneName:'longOffset',
                     year: 'numeric',
                     month: 'numeric',
@@ -69,11 +73,10 @@ export class EpochEngine extends Engine {
                     second: 'numeric',
                     fractionalSecondDigits: 3
                 });
-                break;
         }
     }
 
-    private _getNumber(doc: string): number[] {
+    private _getNumber(doc: string): number {
         let lines = doc.trim().split('\n');
 
         let numLines = lines.map((line) => {
@@ -82,7 +85,7 @@ export class EpochEngine extends Engine {
             else { return 0; }
         });
 
-        return numLines;
+        return numLines[0] || 0;
     }
     
     // dateFormat getter for external access

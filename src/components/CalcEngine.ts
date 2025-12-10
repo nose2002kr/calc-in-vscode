@@ -1,4 +1,4 @@
-import { TextEditor, env } from 'vscode';
+import { TextEditor, env, Selection } from 'vscode';
 import { Engine, EngineResult, EngineRule } from './Engine';
 
 export class CalcEngine extends Engine {
@@ -12,10 +12,17 @@ export class CalcEngine extends Engine {
         }
     ];
     
-    private result: number | null = null;
+    private result: EngineResult | null = null;
 
-    public process(editor: TextEditor): EngineResult {
-        const selectedText = editor.document.getText(editor.selection).trim();
+    public process(editor: TextEditor, selections: readonly Selection[]): EngineResult {
+        const selection = selections[0];
+        if (!selection) {
+            return this.result = {
+                text: `Calc: Error`,
+                copyText: ''
+            };
+        }
+        const selectedText = editor.document.getText(selection).trim();
         
         try {
             // '=' 기호 제거 (앞뒤의 = 기호를 trim)
@@ -29,17 +36,17 @@ export class CalcEngine extends Engine {
             }
             
             // 수식 평가
-            this.result = this.evaluate(expressionWithoutEquals);
+            var evaluated = this.evaluate(expressionWithoutEquals);
             
             // 결과 포맷팅 (소수점이 없으면 정수로, 있으면 소수점 표시)
-            const formattedResult = this.result % 1 === 0 ? this.result.toString() : this.result.toFixed(10).replace(/\.?0+$/, '');
+            const formattedResult = evaluated % 1 === 0 ? evaluated.toString() : evaluated.toFixed(10).replace(/\.?0+$/, '');
             
-            return {
+            return this.result = {
                 text: `Calc: ${formattedResult}`,
                 copyText: formattedResult
             };
         } catch (error) {
-            return {
+            return this.result = {
                 text: `Calc: Error`,
                 copyText: ''
             };
@@ -49,12 +56,7 @@ export class CalcEngine extends Engine {
     public initCommands(commandNamePrefix: string): Array<[string, () => void]> {
         return [
             [`${commandNamePrefix}.copyToClipboard`, () => {
-                if (this.result !== null) {
-                    const formattedResult = this.result % 1 === 0 
-                        ? this.result.toString() 
-                        : this.result.toFixed(10).replace(/\.?0+$/, '');
-                    env.clipboard.writeText(formattedResult);
-                }
+                env.clipboard.writeText(this.result?.copyText ?? '');
             }]
         ];
     }
