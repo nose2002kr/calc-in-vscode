@@ -171,27 +171,53 @@ export class CalcStatusBar {
     
     /**
      * 엔진을 순회하여 forced 상태를 설정
+     * 현재 selection에 매칭되지 않으면 다음 엔진으로 재수행
      */
     private cycleEngine(): void {
+        const editor = window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+        
+        const selectedText = editor.document.getText(editor.selection);
+        if (!selectedText.trim()) {
+            return;
+        }
+        
         // 모든 엔진의 forced를 false로 설정
         this.engines.forEach(engine => {
             engine.setForced(false);
         });
         
-        // 현재 인덱스의 엔진을 forced=true, priority=0으로 설정
-        const currentEngine = this.engines[this.currentEngineIndex];
-        if (currentEngine) {
-            currentEngine.setForced(true);
-            // priority를 0으로 설정하기 위해 첫 번째 룰의 priority를 임시로 0으로 간주
-            // (getPriority에서 forced가 true면 0을 반환하도록 이미 구현됨)
-        }
+        // 시작 인덱스 저장 (무한 루프 방지)
+        let attempts = 0;
+        const maxAttempts = this.engines.length;
         
-        // 다음 엔진으로 순회 (순환)
-        this.currentEngineIndex = (this.currentEngineIndex + 1) % this.engines.length;
-        
-        // 선택이 변경되었으므로 상태바 업데이트
-        if (window.activeTextEditor) {
-            this.onSelectedChange(window.activeTextEditor);
+        // 매칭되는 엔진을 찾을 때까지 순환
+        while (attempts < maxAttempts) {
+            // 현재 인덱스의 엔진을 forced=true로 설정
+            const currentEngine = this.engines[this.currentEngineIndex];
+            if (currentEngine) {
+                currentEngine.setForced(true);
+            }
+            
+            // 현재 엔진이 선택된 텍스트에 매칭되는지 확인
+            if (currentEngine && currentEngine.matches(selectedText)) {
+                // 매칭되는 엔진을 찾았으므로 상태바 업데이트 후 종료
+                if (window.activeTextEditor) {
+                    this.onSelectedChange(window.activeTextEditor);
+                }
+                // 다음 엔진으로 인덱스 이동 (다음 클릭을 위해)
+                this.currentEngineIndex = (this.currentEngineIndex + 1) % this.engines.length;
+                return;
+            }
+            
+            // 매칭되지 않으면 forced를 false로 되돌리고 다음 엔진으로 이동
+            if (currentEngine) {
+                currentEngine.setForced(false);
+            }
+            this.currentEngineIndex = (this.currentEngineIndex + 1) % this.engines.length;
+            attempts++;
         }
     }
 
